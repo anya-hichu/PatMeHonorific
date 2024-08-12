@@ -1,0 +1,12 @@
+{
+    "Author": "Anya Hichu",
+    "Name": "PatMeHonorific",
+    "Punchline": "Pat counter in title",
+    "Description": "Displays pat counter as honorific title dynamically",
+    "ApplicableVersion": "any",
+    "Tags": [
+        "pat",
+        "plugin",
+        "honorific"
+    ]
+}
