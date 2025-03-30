@@ -1,19 +1,22 @@
 using System;
 using System.Numerics;
+using Dalamud.Interface.Components;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Ipc;
 using ImGuiNET;
+using PatMeHonorific.Utils;
 
 namespace PatMeHonorific.Windows;
 
 public class ConfigWindow : Window, IDisposable
 {
-    private Configuration Configuration { get; init; }
+    private Config Config { get; init; }
     private ICallGateSubscriber<int, string> GetCharacterTitle { get; init; }
     private ICallGateSubscriber<int, object> ClearCharacterTitle { get; init; }
-    private string CharacterTitle { get; set; } = string.Empty;
+    private ImGuiHelper ImGuiHelper { get; init; } = new();
 
-    public ConfigWindow(Configuration configuration, ICallGateSubscriber<int, string> getCharacterTitle, ICallGateSubscriber<int, object> clearCharacterTitle) : base("Config Window##configWindow")
+    public ConfigWindow(Config configuration, ICallGateSubscriber<int, string> getCharacterTitle, ICallGateSubscriber<int, object> clearCharacterTitle) : base("Config Window##configWindow")
     {
         SizeConstraints = new WindowSizeConstraints
         {
@@ -21,7 +24,7 @@ public class ConfigWindow : Window, IDisposable
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
 
-        Configuration = configuration;
+        Config = configuration;
         GetCharacterTitle = getCharacterTitle;
         ClearCharacterTitle = clearCharacterTitle;
     }
@@ -30,55 +33,58 @@ public class ConfigWindow : Window, IDisposable
 
     public override void Draw()
     {
-        var enabled = Configuration.Enabled;
+        var enabled = Config.Enabled;
         if (ImGui.Checkbox("Enabled##enabledCheckbox", ref enabled))
         {
-            Configuration.Enabled = enabled;
-            Configuration.Save();
+            Config.Enabled = enabled;
+            Config.Save();
         }
 
-        var characterIndex = Configuration.CharacterIndex;
-        if (ImGui.InputInt("Character index##characterIndexInput", ref characterIndex))
+        var titleTemplate = Config.TitleTemplate;
+        if (ImGui.InputText("Title template##titleDataJsonInput", ref titleTemplate, 255))
         {
-            Configuration.CharacterIndex = characterIndex;
-            Configuration.Save();
+            Config.TitleTemplate = titleTemplate;
+            Config.Save();
+        }
+        ImGuiComponents.HelpMarker("Use {0} as placeholder for count");
+
+        var checkboxSize = new Vector2(ImGui.GetTextLineHeightWithSpacing(), ImGui.GetTextLineHeightWithSpacing());
+        var color = Config.Color;
+        if (ImGuiHelper.DrawColorPicker($"Color###color", ref color, checkboxSize))
+        {
+            Config.Color = color;
+            Config.Save();
         }
 
-        ImGui.Text("Current title: ");
         ImGui.SameLine();
-        ImGui.Text(CharacterTitle);
-        if (ImGui.Button("Refresh##refreshButton"))
+        ImGui.Spacing();
+        ImGui.SameLine();
+        var glow = Config.Glow;
+        if (ImGuiHelper.DrawColorPicker($"Glow###glow", ref glow, checkboxSize))
         {
-            RefreshCharacterTitle();
+            Config.Glow = glow;
+            Config.Save();
         }
 
-        var titleDataJson = Configuration.TitleDataJson;
-        if (ImGui.InputText("Title data json##titleDataJsonInput",  ref titleDataJson, 255))
+        var isPrefix = Config.IsPrefix;
+        if (ImGui.Checkbox($"Prefix###prefix", ref isPrefix))
         {
-            Configuration.TitleDataJson = titleDataJson;
-            Configuration.Save();
+            Config.IsPrefix = isPrefix;
+            Config.Save();
         }
 
-        if (!Configuration.TitleDataJsonValid())
-        {
-            ImGui.Text("Invalid Json Format");
-        }
-
-        if (ImGui.Button("Clear title##clearCharacterTitleButton"))
-        {
-            ClearCharacterTitle.InvokeAction(characterIndex);
-        }
-
-        var autoClearTitleInterval = Configuration.AutoClearTitleInterval;
+        ImGui.NewLine();
+        var autoClearTitleInterval = Config.AutoClearTitleInterval;
         if (ImGui.InputInt("Auto clear title interval in secs##autoClearTitleIntervalInput", ref autoClearTitleInterval))
         {
-            Configuration.AutoClearTitleInterval = autoClearTitleInterval;
-            Configuration.Save();
+            Config.AutoClearTitleInterval = autoClearTitleInterval;
+            Config.Save();
         }
-    }
 
-    private void RefreshCharacterTitle()
-    {
-        CharacterTitle = GetCharacterTitle.InvokeFunc(Configuration.CharacterIndex);
+        ImGui.NewLine();
+        if (ImGui.Button("Clear title##clearCharacterTitleButton"))
+        {
+            ClearCharacterTitle.InvokeAction(0);
+        }
     }
 }

@@ -1,6 +1,10 @@
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
+using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace PatMeHonorific;
 
@@ -9,14 +13,14 @@ public class Updater : IDisposable
     private ICallGateSubscriber<int, string, object> SetCharacterTitle { get; init; }
     private ICallGateSubscriber<int, object> ClearCharacterTitle { get; init; }
 
-    private Configuration Configuration { get; init; }
+    private Config Config { get; init; }
     private IFramework Framework { get; init; }
     private Listener State { get; init; }
     private DateTime? LastTitleUpdateAt { get; set; }
     
 
-    public Updater(Configuration configuration, IFramework framework, Listener state, ICallGateSubscriber<int, string, object> setCharacterTitle, ICallGateSubscriber<int, object> clearCharacterTitle) {
-        Configuration = configuration;
+    public Updater(Config configuration, IFramework framework, Listener state, ICallGateSubscriber<int, string, object> setCharacterTitle, ICallGateSubscriber<int, object> clearCharacterTitle) {
+        Config = configuration;
         Framework = framework;
         State = state;
 
@@ -35,10 +39,18 @@ public class Updater : IDisposable
     public void OnCounterChange(ushort emoteId, uint count)
     {
         // https://github.com/MgAl2O4/PatMeDalamud/blob/main/plugin/data/EmoteConstants.cs#L10
-        if (Configuration.Enabled && emoteId == 105 && Configuration.TitleDataJsonValid())
+        if (Config.Enabled && emoteId == 105)
         {
-            var title = Configuration.TitleDataJson.Replace("{0}", count.ToString());
-            SetCharacterTitle.InvokeAction(Configuration.CharacterIndex, title);
+            var titleData = new Dictionary<string, object>()
+            {
+                { "Title", Config.TitleTemplate.Replace("{0}", count.ToString()) },
+                { "IsPrefix", Config.IsPrefix },
+                { "Color", Config.Color! },
+                { "Glow", Config.Glow! }
+            };
+
+            var title = JsonConvert.SerializeObject(titleData);
+            SetCharacterTitle.InvokeAction(0, title);
             LastTitleUpdateAt = DateTime.Now;
         }
     }
@@ -48,9 +60,9 @@ public class Updater : IDisposable
         if (LastTitleUpdateAt.HasValue)
         {
             var delta = DateTime.Now - LastTitleUpdateAt.Value;
-            if (delta.TotalSeconds > Configuration.AutoClearTitleInterval)
+            if (delta.TotalSeconds > Config.AutoClearTitleInterval)
             {
-                ClearCharacterTitle.InvokeAction(Configuration.CharacterIndex);
+                ClearCharacterTitle.InvokeAction(0);
                 LastTitleUpdateAt = null;
             }
         }

@@ -14,7 +14,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IGameInteropProvider GameInteropProvider { get; private set; } = null!;
     [PluginService] internal static IPluginLog PluginLog { get; private set; } = null!;
 
-    public Configuration Configuration { get; init; }
+    public Config Config { get; init; }
 
     public readonly WindowSystem WindowSystem = new("PatMeHonorific");
     private ConfigWindow ConfigWindow { get; init; }
@@ -24,16 +24,20 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin()
     {
-        Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        Config = PluginInterface.GetPluginConfig() as Config ?? new Config();
+        Config.MaybeMigrateToV1();
 
         var getCharacterTitle = PluginInterface.GetIpcSubscriber<int, string>("Honorific.GetCharacterTitle");
         var setCharacterTitle = PluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
         var clearCharacterTitle = PluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
 
-        ConfigWindow = new(Configuration, getCharacterTitle, clearCharacterTitle);
+
+        ConfigWindow = new(Config, getCharacterTitle, clearCharacterTitle);
+
+
         ParsedConfig = new(PluginInterface);
         State = new Listener(ClientState, Framework, ParsedConfig, PluginLog, GameInteropProvider);
-        Updater = new(Configuration, Framework, State, setCharacterTitle, clearCharacterTitle);
+        Updater = new(Config, Framework, State, setCharacterTitle, clearCharacterTitle);
 
         WindowSystem.AddWindow(ConfigWindow);
 
