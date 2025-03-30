@@ -8,26 +8,32 @@ namespace PatMeHonorific;
 
 public sealed class Plugin : IDalamudPlugin
 {
+    [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
+    [PluginService] internal static IGameInteropProvider GameInteropProvider { get; private set; } = null!;
+    [PluginService] internal static IPluginLog PluginLog { get; private set; } = null!;
 
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("PatMeHonorific");
     private ConfigWindow ConfigWindow { get; init; }
     private Updater Updater { get; init; }
+    private Listener State { get; init; }
+    private ParsedConfig ParsedConfig { get; init; }
 
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         var getCharacterTitle = PluginInterface.GetIpcSubscriber<int, string>("Honorific.GetCharacterTitle");
-        var clearCharacterTitle = PluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
-        ConfigWindow = new(Configuration, getCharacterTitle, clearCharacterTitle);
-
-        var counterChanged = PluginInterface.GetIpcSubscriber<string, uint, object?>("PatMe.CounterChanged");
         var setCharacterTitle = PluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
-        Updater = new(Configuration, Framework, counterChanged, setCharacterTitle, clearCharacterTitle);
+        var clearCharacterTitle = PluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
+
+        ConfigWindow = new(Configuration, getCharacterTitle, clearCharacterTitle);
+        ParsedConfig = new(PluginInterface);
+        State = new Listener(ClientState, Framework, ParsedConfig, PluginLog, GameInteropProvider);
+        Updater = new(Configuration, Framework, State, setCharacterTitle, clearCharacterTitle);
 
         WindowSystem.AddWindow(ConfigWindow);
 
