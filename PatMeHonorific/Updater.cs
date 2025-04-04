@@ -3,13 +3,13 @@ using Dalamud.Plugin.Services;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
 
 namespace PatMeHonorific;
 
 public class Updater : IDisposable
 {
+
+
     private ICallGateSubscriber<int, string, object> SetCharacterTitle { get; init; }
     private ICallGateSubscriber<int, object> ClearCharacterTitle { get; init; }
 
@@ -39,19 +39,25 @@ public class Updater : IDisposable
     public void OnCounterChange(ushort emoteId, uint count)
     {
         // https://github.com/MgAl2O4/PatMeDalamud/blob/main/plugin/data/EmoteConstants.cs#L10
-        if (Config.Enabled && emoteId == 105)
+        if (Config.Enabled)
         {
-            var titleData = new Dictionary<string, object>()
+            if(Config.EMOTE_ID_TO_EMOTE.TryGetValue(emoteId, out var emote)) 
             {
-                { "Title", Config.TitleTemplate.Replace("{0}", count.ToString()) },
-                { "IsPrefix", Config.IsPrefix },
-                { "Color", Config.Color! },
-                { "Glow", Config.Glow! }
-            };
-
-            var title = JsonConvert.SerializeObject(titleData);
-            SetCharacterTitle.InvokeAction(0, title);
-            LastTitleUpdateAt = DateTime.Now;
+                var emoteConfig = Config.Emotes[emote];
+                if (emoteConfig.Enabled)
+                {
+                    var titleData = new Dictionary<string, object>()
+                    {
+                        { "Title", emoteConfig.TitleTemplate.Replace("{0}", count.ToString()) },
+                        { "IsPrefix", emoteConfig.IsPrefix },
+                        { "Color", emoteConfig.Color! },
+                        { "Glow", emoteConfig.Glow! }
+                    };
+                    var title = JsonConvert.SerializeObject(titleData);
+                    SetCharacterTitle.InvokeAction(0, title);
+                    LastTitleUpdateAt = DateTime.Now;
+                }
+            }
         }
     }
 

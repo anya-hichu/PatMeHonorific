@@ -1,6 +1,7 @@
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace PatMeHonorific;
@@ -18,7 +19,12 @@ public class Listener
 
     public event Action<ushort, uint>? OnCounterChanged;
 
-    private uint PatCounter { get; set; } = 0;
+    private Dictionary<Emote, uint> Counters { get; init; } = new()
+    {
+        { Emote.Pet, 0 },
+        { Emote.Dote, 0 },
+        { Emote.Hug, 0 }
+    };
 
     public Listener(IClientState clientState, IFramework framework, ParsedConfig parsedConfig, IPluginLog pluginLog, IGameInteropProvider gameInteropProvider)
     {
@@ -54,14 +60,16 @@ public class Listener
         {
             if (ClientState.LocalPlayer != null)
             {
-                PluginLog.Debug($"TEST: {ParsedConfig.Data.EmoteData.Length}");
                 var emoteData = ParsedConfig.Data.EmoteData.FirstOrDefault(d => d.CID == ClientState.LocalContentId);
                 if (emoteData != null)
                 {
-                    var patCounter = emoteData.Counters.FirstOrDefault(c => c.Name == "Pet");
-                    if (patCounter != null)
+                    foreach (var counter in Counters)
                     {
-                        PatCounter = patCounter.Value;
+                        var dataCounter = emoteData.Counters.FirstOrDefault(c => c.Name == counter.Key.ToString());
+                        if (dataCounter != null)
+                        {
+                            Counters[counter.Key] = dataCounter.Value;
+                        }
                     }
                 }
             }
@@ -74,8 +82,11 @@ public class Listener
         {
             if (targetId == ClientState.LocalPlayer.GameObjectId)
             {
-                PatCounter++;
-                OnCounterChanged?.Invoke(emoteId, PatCounter);
+                if (Config.EMOTE_ID_TO_EMOTE.TryGetValue(emoteId, out var emote))
+                {
+                    Counters[emote]++;
+                    OnCounterChanged?.Invoke(emoteId, Counters[emote]);
+                }      
             }
         }
 
