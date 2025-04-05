@@ -33,8 +33,8 @@ public class Config : IPluginConfiguration
     {
         public string Title { get; set; } = string.Empty;
         public bool IsPrefix { get; set; }
-        public Vector3 Color { get; set; }
-        public Vector3 Glow { get; set; }
+        public Vector3? Color { get; set; }
+        public Vector3? Glow { get; set; }
     }
 
     [Obsolete("TitleDataJson split into multiple fields in version 1")]
