@@ -13,6 +13,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
     [PluginService] internal static IGameInteropProvider GameInteropProvider { get; private set; } = null!;
     [PluginService] internal static IPluginLog PluginLog { get; private set; } = null!;
+    [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
 
     public Config Config { get; init; }
 
@@ -41,7 +42,7 @@ public sealed class Plugin : IDalamudPlugin
         ConfigWindow = new(Config, clearCharacterTitle);
 
         ParsedConfig = new(PluginInterface);
-        State = new Listener(ClientState, Framework, ParsedConfig, PluginLog, GameInteropProvider);
+        State = new Listener(ClientState, Framework, ParsedConfig, PluginLog, GameInteropProvider, ObjectTable);
         Updater = new(Config, Framework, State, setCharacterTitle, clearCharacterTitle);
 
         WindowSystem.AddWindow(ConfigWindow);

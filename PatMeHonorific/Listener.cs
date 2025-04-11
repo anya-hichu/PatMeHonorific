@@ -1,5 +1,7 @@
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,6 +15,7 @@ public class Listener
     private ParsedConfig ParsedConfig { get; init; }
     private IPluginLog PluginLog { get; init; }
     private IGameInteropProvider GameInteropProvider { get; init; }
+    private IObjectTable ObjectTable { get; init; }
 
     public delegate void OnEmoteFuncDelegate(ulong unk, ulong instigatorAddr, ushort emoteId, ulong targetId, ulong unk2);
     private readonly Hook<OnEmoteFuncDelegate>? hookEmote;
@@ -26,13 +29,14 @@ public class Listener
         { Emote.Hug, 0 }
     };
 
-    public Listener(IClientState clientState, IFramework framework, ParsedConfig parsedConfig, IPluginLog pluginLog, IGameInteropProvider gameInteropProvider)
+    public Listener(IClientState clientState, IFramework framework, ParsedConfig parsedConfig, IPluginLog pluginLog, IGameInteropProvider gameInteropProvider, IObjectTable objectTable)
     {
         ClientState = clientState;
         Framework = framework;
         ParsedConfig = parsedConfig;
         PluginLog = pluginLog;
         GameInteropProvider = gameInteropProvider;
+        ObjectTable = objectTable;
 
         try
         {
@@ -76,11 +80,12 @@ public class Listener
         });
     }
 
-    private void OnEmoteDetour(ulong unk, ulong instigatorAddr, ushort emoteId, ulong targetId, ulong unk2)
+    private void OnEmoteDetour(ulong unk, ulong instiguatorAddr, ushort emoteId, ulong targetId, ulong unk2)
     {
         if (ClientState.LocalPlayer != null)
         {
-            if (targetId == ClientState.LocalPlayer.GameObjectId)
+            var instiguator = ObjectTable.FirstOrDefault(x => (ulong)x.Address == instiguatorAddr) as IPlayerCharacter;
+            if (targetId == ClientState.LocalPlayer.GameObjectId && instiguator != null && instiguator.GameObjectId != targetId)
             {
                 if (Config.EMOTE_ID_TO_EMOTE.TryGetValue(emoteId, out var emote))
                 {
@@ -90,6 +95,6 @@ public class Listener
             }
         }
 
-        hookEmote?.Original(unk, instigatorAddr, emoteId, targetId, unk2);
+        hookEmote?.Original(unk, instiguatorAddr, emoteId, targetId, unk2);
     }
 }

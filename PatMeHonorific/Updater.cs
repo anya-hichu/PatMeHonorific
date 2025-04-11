@@ -15,16 +15,16 @@ public class Updater : IDisposable
 
     private Config Config { get; init; }
     private IFramework Framework { get; init; }
-    private Listener State { get; init; }
+    private Listener Listener { get; init; }
     private DateTime? LastTitleUpdateAt { get; set; }
     
 
-    public Updater(Config configuration, IFramework framework, Listener state, ICallGateSubscriber<int, string, object> setCharacterTitle, ICallGateSubscriber<int, object> clearCharacterTitle) {
+    public Updater(Config configuration, IFramework framework, Listener listener, ICallGateSubscriber<int, string, object> setCharacterTitle, ICallGateSubscriber<int, object> clearCharacterTitle) {
         Config = configuration;
         Framework = framework;
-        State = state;
+        Listener = listener;
 
-        State.OnCounterChanged += OnCounterChange;
+        Listener.OnCounterChanged += OnCounterChange;
         SetCharacterTitle = setCharacterTitle;
         ClearCharacterTitle = clearCharacterTitle;
         Framework.Update += OnFrameworkUpdate;
@@ -32,7 +32,7 @@ public class Updater : IDisposable
 
     public void Dispose()
     {
-        State.OnCounterChanged -= OnCounterChange;
+        Listener.OnCounterChanged -= OnCounterChange;
         Framework.Update -= OnFrameworkUpdate;
     }
 
