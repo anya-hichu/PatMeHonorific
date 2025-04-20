@@ -18,13 +18,6 @@ namespace PatMeHonorific.Windows;
 
 public class ConfigWindow : Window
 {
-    private static readonly Dictionary<string, ushort> EMOTE_NAME_TO_ID = new()
-    {
-        { "Pet", 105 },
-        { "Dote", 146 },
-        { "Hug", 112 },
-    };
-
     private static readonly string CONFIRM_DELETE_HINT = "Press CTRL while clicking to confirm";
 
     private Config Config { get; init; }
@@ -68,11 +61,14 @@ public class ConfigWindow : Window
         ImGui.SameLine(ImGui.GetWindowWidth() - 135);
         if (ImGui.Button("Sync###sync"))
         {
-            Sync();
+            if(PatMeConfig.TrySync(Config))
+            {
+                Config.Save();
+            }
         }
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Overrides internal counter with PatMe ones if higher\nCounters can be displayed using: /patmehonorific info");
+            ImGui.SetTooltip("Overrides internal counters with PatMe ones\nCounters can be displayed using: /patmehonorific info");
         }
 
         ImGui.SameLine();
@@ -211,33 +207,6 @@ public class ConfigWindow : Window
         if (ImGui.InputInt("Auto clear (secs)###autoClearTitleInterval", ref autoClearTitleInterval))
         {
             Config.AutoClearTitleInterval = autoClearTitleInterval;
-            Config.Save();
-        }
-    }
-
-    private void Sync()
-    {
-        var parsed = PatMeConfig.Parsed;
-        if (parsed != null)
-        {
-            foreach (var emoteData in parsed.EmoteData)
-            {
-                var characterId = emoteData.CID;
-                foreach (var counter in emoteData.Counters)
-                {
-                    var emoteId = EMOTE_NAME_TO_ID[counter.Name];
-                    var key = new EmoteCounterKey() { CharacterId = characterId, EmoteId = emoteId, Direction = EmoteDirection.Receiving };
-
-                    if (Config.Counters.ContainsKey(key) && Config.Counters[key] < counter.Value)
-                    {
-                        Config.Counters[key] = counter.Value;
-                    }
-                    else 
-                    {
-                        Config.Counters.Add(key, counter.Value);
-                    }
-                }
-            }
             Config.Save();
         }
     }

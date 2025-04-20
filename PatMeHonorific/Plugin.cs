@@ -44,7 +44,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             EmoteConfigs = [
                 new() { Name = "Receiving Pet", EmoteIds = [105], TitleTemplate = "Pet Counter {0}" },
-                new() { Name = "Receiving Dote", EmoteIds = [146, 147], TitleTemplate = "Dote Counter {0}" },
+                new() { Name = "Receiving Dote", EmoteIds = [146], TitleTemplate = "Dote Counter {0}" },
                 new() { Name = "Receiving Hug",  EmoteIds = [112, 113], TitleTemplate = "Hug Counter {0}" }
             ]
         };
