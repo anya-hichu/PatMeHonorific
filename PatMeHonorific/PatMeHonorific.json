@@ -1,11 +1,11 @@
 {
     "Author": "Anya Hichu",
     "Name": "PatMeHonorific",
-    "Punchline": "Pat counter in title",
-    "Description": "Displays pat counter as honorific title dynamically",
+    "Punchline": "Show your emote goals",
+    "Description": "Displays emote counters as honorific title dynamically",
     "ApplicableVersion": "any",
     "Tags": [
-        "pat",
+        "emote",
         "plugin",
         "honorific"
     ]

@@ -2,11 +2,11 @@ using Dalamud.Plugin;
 using Newtonsoft.Json;
 using System.IO;
 
-namespace PatMeHonorific;
+namespace PatMeHonorific.Interop;
 
-public class ParsedConfig
+public class PatMeConfig
 {
-    public class PatMeConfig
+    public class Config
     {
         [JsonProperty(Required = Required.Always)]
         public EmoteDataConfig[] EmoteData { get; set; } = [];
@@ -30,21 +30,20 @@ public class ParsedConfig
         public uint Value { get; set; }
     }
 
-    private string PluginConfigsDirectory { get; init; }
-    public PatMeConfig Data { get; init; } = new();
+    public Config? Parsed { get; init; }
 
-    public ParsedConfig(IDalamudPluginInterface pluginInterface)
+    public PatMeConfig(IDalamudPluginInterface pluginInterface)
     {
-        PluginConfigsDirectory = Path.GetFullPath(Path.Combine(pluginInterface.GetPluginConfigDirectory(), ".."));
+        var pluginConfigsDirectory = Path.GetFullPath(Path.Combine(pluginInterface.GetPluginConfigDirectory(), ".."));
 
         // %appdata%\xivlauncher\pluginConfigs\PatMe.json
-        var patMeConfigPath = Path.Combine(PluginConfigsDirectory, "PatMe.json");
+        var patMeConfigPath = Path.Combine(pluginConfigsDirectory, "PatMe.json");
 
         if (Path.Exists(patMeConfigPath))
         {
             using StreamReader patMeConfigFile = new(patMeConfigPath);
             var patMeConfigJson = patMeConfigFile.ReadToEnd();
-            Data = JsonConvert.DeserializeObject<PatMeConfig>(patMeConfigJson)!;
+            Parsed = JsonConvert.DeserializeObject<Config>(patMeConfigJson)!;
         }
     }
 }

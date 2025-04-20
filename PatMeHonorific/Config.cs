@@ -1,8 +1,10 @@
 using Dalamud.Configuration;
 using Newtonsoft.Json;
-using PatMeHonorific.Configs;
+using PatMeHonorific.Emotes;
+using PatMeHonorific.Interop;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 
 namespace PatMeHonorific;
@@ -10,7 +12,19 @@ namespace PatMeHonorific;
 [Serializable]
 public class Config : IPluginConfiguration
 {
-    public static readonly Dictionary<ulong, Emote> EMOTE_ID_TO_EMOTE = new()
+    public static readonly int LATEST = 3;
+
+    public int Version { get; set; } = LATEST;
+
+    public bool Enabled { get; set; } = true;
+
+    public List<EmoteConfig> EmoteConfigs { get; init; } = [];
+
+    public EmoteCounters Counters { get; set; } = [];
+
+    #region deprecated
+    [Obsolete("Configurable ids in config version 3")]
+    public static readonly Dictionary<ushort, Emote> EMOTE_ID_TO_EMOTE = new()
     {
         { 105, Emote.Pet },
         { 146, Emote.Dote },
@@ -19,15 +33,9 @@ public class Config : IPluginConfiguration
         { 113, Emote.Hug }
     };
 
-    public static readonly int LATEST = 2;
-
-    public int Version { get; set; } = LATEST;
-
-    public bool Enabled { get; set; } = true;
-
+    [Obsolete("Configurable ids in config version 3")]
     public Dictionary<Emote, EmoteConfig> Emotes { get; init; } = [];
 
-    #region deprecated
     [Obsolete("TitleDataJson split into multiple fields in version 1")]
     class TitleDataJsonObject
     {
@@ -51,16 +59,8 @@ public class Config : IPluginConfiguration
 
     [Obsolete("Add support for multiple emotes in version 2")]
     public Vector3? Glow { get; set; }
-    #endregion
 
-    public int AutoClearTitleInterval { get; set; } = 5; // seconds
-
-    public void Save()
-    {
-        Plugin.PluginInterface.SavePluginConfig(this);
-    }
-
-    public void MaybeMigrate()
+    public void MaybeMigrate(PatMeConfig patMeConfig)
     {
         if (Version < LATEST)
         {
@@ -107,8 +107,52 @@ public class Config : IPluginConfiguration
                 Glow = null;
             }
 
+            if (Version < 3)
+            {
+                var parsed = patMeConfig.Parsed;
+                if (parsed != null)
+                {
+                    foreach (var emoteData in parsed.EmoteData)
+                    {
+                        var characterId = emoteData.CID;
+                        foreach (var counter in emoteData.Counters)
+                        {
+                            // Register to first match only
+                            var pair = EMOTE_ID_TO_EMOTE.First(e => e.Value.ToString() == counter.Name);
+                            Counters.Add(new() { CharacterId = characterId, EmoteId = pair.Key, Direction = EmoteDirection.Receiving }, counter.Value);
+                        }
+                    }
+                }
+
+                foreach (var emotePair in Emotes)
+                {
+                    var emoteConfig = emotePair.Value;
+                    EmoteConfigs.Add(new()
+                    {
+                        Enabled = emoteConfig.Enabled,
+                        Name = $"Receiving {emotePair.Key}",
+                        TitleTemplate = emoteConfig.TitleTemplate,
+                        IsPrefix = emoteConfig.IsPrefix,
+                        Color = emoteConfig.Color,
+                        Glow = emoteConfig.Glow,
+                        EmoteIds = [.. EMOTE_ID_TO_EMOTE.Where(pair => pair.Value == emotePair.Key).Select(p => p.Key)],
+                        Direction = EmoteDirection.Receiving
+                    });
+                }
+                Emotes.Clear();
+                TitleDataJson = string.Empty;
+            }
+
             Version = LATEST;
             Save();
-        }  
+        }
+    }
+    #endregion
+
+    public int AutoClearTitleInterval { get; set; } = 5; // seconds
+
+    public void Save()
+    {
+        Plugin.PluginInterface.SavePluginConfig(this);
     }
 }

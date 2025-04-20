@@ -1,54 +1,100 @@
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
 using Newtonsoft.Json;
+using PatMeHonorific.Emotes;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace PatMeHonorific;
 
 public class Updater : IDisposable
 {
-
+    private IClientState ClientState { get; init; }
+    private Config Config { get; init; }
+    private EmoteHook EmoteHook { get; init; }
+    private IFramework Framework { get; init; }
+    private IObjectTable ObjectTable { get; init; }
 
     private ICallGateSubscriber<int, string, object> SetCharacterTitle { get; init; }
     private ICallGateSubscriber<int, object> ClearCharacterTitle { get; init; }
 
-    private Config Config { get; init; }
-    private IFramework Framework { get; init; }
-    private Listener Listener { get; init; }
     private DateTime? LastTitleUpdateAt { get; set; }
-    
 
-    public Updater(Config configuration, IFramework framework, Listener listener, ICallGateSubscriber<int, string, object> setCharacterTitle, ICallGateSubscriber<int, object> clearCharacterTitle) {
-        Config = configuration;
-        Framework = framework;
-        Listener = listener;
-
-        Listener.OnCounterChanged += OnCounterChange;
-        SetCharacterTitle = setCharacterTitle;
+    public Updater(ICallGateSubscriber<int, object> clearCharacterTitle, IClientState clientState, Config config, EmoteHook emoteHook, IFramework framework, IObjectTable objectTable, ICallGateSubscriber<int, string, object> setCharacterTitle) {
         ClearCharacterTitle = clearCharacterTitle;
+        ClientState = clientState;
+        Config = config;
+        EmoteHook = emoteHook;
+        Framework = framework;
+        ObjectTable = objectTable;
+        SetCharacterTitle = setCharacterTitle;
+
         Framework.Update += OnFrameworkUpdate;
+        EmoteHook.OnEmote += OnEmote;
     }
 
     public void Dispose()
     {
-        Listener.OnCounterChanged -= OnCounterChange;
+        EmoteHook.OnEmote -= OnEmote;
         Framework.Update -= OnFrameworkUpdate;
     }
 
-    public void OnCounterChange(ushort emoteId, uint count)
+    private bool TryUpdateCounter(ulong instigatorAddr, ushort emoteId, ulong targetId, out EmoteConfig? emoteConfig, out uint totalCounter)
     {
-        // https://github.com/MgAl2O4/PatMeDalamud/blob/main/plugin/data/EmoteConstants.cs#L10
+        var localPlayer = ClientState.LocalPlayer;
+        if (localPlayer != null && ObjectTable.FirstOrDefault(x => (ulong)x.Address == instigatorAddr) is IPlayerCharacter instigator && instigator.GameObjectId != targetId)
+        {
+            EmoteDirection? maybeDirection = null;
+            if (targetId == localPlayer.GameObjectId)
+            {
+                maybeDirection = EmoteDirection.Receiving;
+            } 
+            else if (instigator.GameObjectId == localPlayer.GameObjectId)
+            {
+                maybeDirection = EmoteDirection.Giving;
+            }
+
+            if (maybeDirection.HasValue)
+            {
+                var direction = maybeDirection.Value;
+                var characterId = ClientState.LocalContentId;
+
+                emoteConfig = Config.EmoteConfigs.Find(c => c.Enabled && c.EmoteIds.Contains(emoteId) && c.Direction == direction);
+                if (emoteConfig != null)
+                {
+                    totalCounter = 0;
+                    foreach (var configEmoteId in emoteConfig.EmoteIds) {
+                        var key = new EmoteCounterKey() { CharacterId = characterId, Direction = direction, EmoteId = configEmoteId };
+                        Config.Counters.TryAdd(key, 0);
+                        if (configEmoteId == emoteId)
+                        {
+                            Config.Counters[key] += 1;
+                            Config.Save();
+                        }
+                        totalCounter += Config.Counters[key];
+                    }
+                    return true;
+                }
+            }
+        }
+        emoteConfig = default;
+        totalCounter = default;
+        return false;
+    }
+
+    public void OnEmote(ulong instigatorAddr, ushort emoteId, ulong targetId)
+    {
         if (Config.Enabled)
         {
-            if(Config.EMOTE_ID_TO_EMOTE.TryGetValue(emoteId, out var emote)) 
+            if (TryUpdateCounter(instigatorAddr, emoteId, targetId, out var emoteConfig, out var totalCounter))
             {
-                var emoteConfig = Config.Emotes[emote];
-                if (emoteConfig.Enabled)
+                if (emoteConfig != null)
                 {
                     var titleData = new Dictionary<string, object>()
                     {
-                        { "Title", emoteConfig.TitleTemplate.Replace("{0}", count.ToString()) },
+                        { "Title", string.Format(emoteConfig.TitleTemplate, totalCounter) },
                         { "IsPrefix", emoteConfig.IsPrefix },
                         { "Color", emoteConfig.Color! },
                         { "Glow", emoteConfig.Glow! }
@@ -56,8 +102,8 @@ public class Updater : IDisposable
                     var title = JsonConvert.SerializeObject(titleData);
                     SetCharacterTitle.InvokeAction(0, title);
                     LastTitleUpdateAt = DateTime.Now;
-                }
-            }
+                }  
+            }   
         }
     }
 

@@ -1,5 +1,3 @@
-
-
 using Dalamud.Interface.Utility;
 using ImGuiNET;
 using System.Numerics;
