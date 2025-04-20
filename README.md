@@ -1,6 +1,8 @@
 # PatMeHonorific
 
-Displays emote counters in honorific title (not limited to just pats/dote/hug)
+## Installation
+
+Installable using my custom repository (instructions here: https://github.com/anya-hichu/DalamudPluginRepo) or from compiled archives.
 
 ## Commands
 
