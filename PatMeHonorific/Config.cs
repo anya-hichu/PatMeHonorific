@@ -67,7 +67,7 @@ public class Config : IPluginConfiguration
             if (Version < 1)
             {
                 var titleDataJsonObject = JsonConvert.DeserializeObject<TitleDataJsonObject>(TitleDataJson);
-                TitleTemplate = titleDataJsonObject.Title;
+                TitleTemplate = titleDataJsonObject!.Title;
                 IsPrefix = titleDataJsonObject.IsPrefix;
                 Color = titleDataJsonObject.Color;
                 Glow = titleDataJsonObject.Glow;

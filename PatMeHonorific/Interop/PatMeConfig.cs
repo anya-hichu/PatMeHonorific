@@ -84,7 +84,11 @@ public class PatMeConfig
                     // Update the count of the first emote only since patme doesn't differentiate
                     if (i == 0)
                     {
-                        config.Counters[key] += counter.Value - totalCounter;
+                        var value = counter.Value - totalCounter;
+                        if (!config.Counters.TryAdd(key, value))
+                        {
+                            config.Counters[key] += value;
+                        }
                     }
                 }
             }

@@ -6,6 +6,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using ImGuiNET;
 using Lumina.Excel;
@@ -24,8 +25,9 @@ public class ConfigWindow : Window
     private Dictionary<ushort, HashSet<string>> CommandsByEmoteId { get; init; }
     private ImGuiHelper ImGuiHelper { get; init; } = new();
     private PatMeConfig PatMeConfig { get; init; }
+    private IPluginLog PluginLog { get; init; }
 
-    public ConfigWindow(Config config, ExcelSheet<Emote> emoteSheet, PatMeConfig patMeConfig) : base("PatMeHonorific - Config##configWindow")
+    public ConfigWindow(Config config, ExcelSheet<Emote> emoteSheet, PatMeConfig patMeConfig, IPluginLog pluginLog) : base("PatMeHonorific - Config##configWindow")
     {
         SizeConstraints = new WindowSizeConstraints
         {
@@ -47,6 +49,7 @@ public class ConfigWindow : Window
         });
 
         PatMeConfig = patMeConfig;
+        PluginLog = pluginLog;
     }
 
     public override void Draw()
@@ -64,6 +67,11 @@ public class ConfigWindow : Window
             if(PatMeConfig.TrySync(Config))
             {
                 Config.Save();
+                PluginLog.Error("Successfully synced with patme");
+            } 
+            else
+            {
+                PluginLog.Error("Failed to sync with patme");
             }
         }
         if (ImGui.IsItemHovered())
