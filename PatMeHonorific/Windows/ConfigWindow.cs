@@ -21,20 +21,22 @@ public class ConfigWindow : Window
 {
     private static readonly string CONFIRM_DELETE_HINT = "Press CTRL while clicking to confirm";
 
+    private IClientState ClientState { get; init; }
     private Config Config { get; init; }
     private Dictionary<ushort, HashSet<string>> CommandsByEmoteId { get; init; }
     private ImGuiHelper ImGuiHelper { get; init; } = new();
     private PatMeConfig PatMeConfig { get; init; }
     private IPluginLog PluginLog { get; init; }
 
-    public ConfigWindow(Config config, ExcelSheet<Emote> emoteSheet, PatMeConfig patMeConfig, IPluginLog pluginLog) : base("PatMeHonorific - Config##configWindow")
+    public ConfigWindow(IClientState clientState, Config config, ExcelSheet<Emote> emoteSheet, PatMeConfig patMeConfig, IPluginLog pluginLog) : base("PatMeHonorific - Config##configWindow")
     {
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(500, 300),
+            MinimumSize = new Vector2(550, 360),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
 
+        ClientState = clientState;
         Config = config;
 
         CommandsByEmoteId = emoteSheet.Where(s => s.TextCommand.IsValid).ToDictionary(s => Convert.ToUInt16(s.RowId), s => {
@@ -67,7 +69,7 @@ public class ConfigWindow : Window
             if(PatMeConfig.TrySync(Config))
             {
                 Config.Save();
-                PluginLog.Error("Successfully synced with patme");
+                PluginLog.Info("Successfully synced with patme");
             } 
             else
             {
@@ -104,7 +106,7 @@ public class ConfigWindow : Window
 
         using (ImRaii.TabBar("emoteConfigsTabBar", ImGuiTabBarFlags.AutoSelectNewTabs | ImGuiTabBarFlags.TabListPopupButton | ImGuiTabBarFlags.FittingPolicyScroll))
         {
-            foreach (var emoteConfig in Config.EmoteConfigs)
+            foreach (var emoteConfig in Config.EmoteConfigs.OrderByDescending(c => c.Priority))
             {
                 var baseId = $"emoteConfigs{emoteConfig.GetHashCode()}";
 
@@ -122,7 +124,13 @@ public class ConfigWindow : Window
                                 Config.Save();
                             }
 
-                            ImGui.SameLine(ImGui.GetWindowWidth() - 75);
+                            ImGui.SameLine(ImGui.GetWindowWidth() - 145);
+                            if (ImGui.Button($"Duplicate###{baseId}Duplicate"))
+                            {
+                                Config.EmoteConfigs.Add(emoteConfig.Clone());
+                                Config.Save();
+                            }
+                            ImGui.SameLine();
                             using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.DalamudRed))
                             {
                                 if (ImGui.Button($"Delete###{baseId}Delete") && ImGui.GetIO().KeyCtrl)
@@ -139,6 +147,13 @@ public class ConfigWindow : Window
                             if (ImGui.InputText($"Name###{baseId}Name", ref name, 255))
                             {
                                 emoteConfig.Name = name;
+                                Config.Save();
+                            }
+
+                            var priority = emoteConfig.Priority;
+                            if (ImGui.InputInt($"Priority###{baseId}Priority", ref priority, 1))
+                            {
+                                emoteConfig.Priority = priority;
                                 Config.Save();
                             }
 
@@ -170,9 +185,32 @@ public class ConfigWindow : Window
                             }
 
 
+                            var characterIds = emoteConfig.CharacterIds;
+                            var joinedCharacterIds = string.Join(',', characterIds);
+                            if (ImGui.InputText($"Characters###{baseId}joinedCharacterIds", ref joinedCharacterIds, 255))
+                            {
+                                var rawCharacterIds = joinedCharacterIds.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                                emoteConfig.CharacterIds = [.. rawCharacterIds.Where(s => ulong.TryParse(s, out var _)).Select(s => ulong.Parse(s))];
+                                Config.Save();
+                            }
+                            if (ImGui.IsItemHovered())
+                            {
+                                ImGui.SetTooltip("Comma-separated list of character ids, empty means all characters");
+                            }
+                            ImGui.SameLine();
+                            if (ImGui.Button($"Add Current"))
+                            {
+                                emoteConfig.CharacterIds.Add(ClientState.LocalContentId);
+                                Config.Save();
+                            }
+                            if (ImGui.IsItemHovered())
+                            {
+                                ImGui.SetTooltip($"Current: {ClientState.LocalPlayer?.Name} ({ClientState.LocalContentId})");
+                            }
+
 
                             var titleTemplate = emoteConfig.TitleTemplate;
-                            if (ImGui.InputText($"Title template###{baseId}TitleDataJsonInput", ref titleTemplate, 255))
+                            if (ImGui.InputText($"Title template###{baseId}TitleTemplate", ref titleTemplate, 255))
                             {
                                 emoteConfig.TitleTemplate = titleTemplate;
                                 Config.Save();

@@ -56,7 +56,7 @@ public sealed class Plugin : IDalamudPlugin
         var clearCharacterTitle = PluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
 
         EmoteSheet = DataManager.GetExcelSheet<Emote>()!;
-        ConfigWindow = new(Config, EmoteSheet, patMeConfig, PluginLog);
+        ConfigWindow = new(ClientState, Config, EmoteSheet, patMeConfig, PluginLog);
         EmoteHook = new(PluginLog, GameInteropProvider);
 
         Updater = new(clearCharacterTitle, ClientState, Config, EmoteHook, Framework, ObjectTable, setCharacterTitle);

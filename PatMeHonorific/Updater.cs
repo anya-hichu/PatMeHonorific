@@ -61,7 +61,7 @@ public class Updater : IDisposable
                 var direction = maybeDirection.Value;
                 var characterId = ClientState.LocalContentId;
 
-                emoteConfig = Config.EmoteConfigs.Find(c => c.Enabled && c.EmoteIds.Contains(emoteId) && c.Direction == direction);
+                emoteConfig = Config.EmoteConfigs.OrderByDescending(c => c.Priority).FirstOrDefault(c => c.Enabled && c.EmoteIds.Contains(emoteId) && c.Direction == direction && (c.CharacterIds.Count == 0 || c.CharacterIds.Contains(ClientState.LocalContentId)));
                 if (emoteConfig != null)
                 {
                     totalCounter = 0;

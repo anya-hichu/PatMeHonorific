@@ -8,7 +8,10 @@ namespace PatMeHonorific.Emotes;
 public class EmoteConfig
 {
     public bool Enabled { get; set; } = true;
+
     public string Name { get; set; } = string.Empty;
+
+    public int Priority { get; set; } = 0;
 
     public string TitleTemplate { get; set; } = string.Empty;
     public bool IsPrefix { get; set; } = false;
@@ -16,5 +19,13 @@ public class EmoteConfig
     public Vector3? Glow { get; set; }
 
     public HashSet<ushort> EmoteIds { get; set; } = [];
+    
     public EmoteDirection Direction { get; set; } = EmoteDirection.Receiving;
+
+    public HashSet<ulong> CharacterIds { get; set; } = [];
+
+    public EmoteConfig Clone()
+    {
+        return (EmoteConfig)MemberwiseClone();
+    }
 }
