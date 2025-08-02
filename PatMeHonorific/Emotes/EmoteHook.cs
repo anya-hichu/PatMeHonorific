@@ -37,7 +37,14 @@ public class EmoteHook
 
     private void OnEmoteDetour(ulong unk, ulong instigatorAddr, ushort emoteId, ulong targetId, ulong unk2)
     {
-        OnEmote?.Invoke(instigatorAddr, emoteId, targetId);
+        try
+        {
+            OnEmote?.Invoke(instigatorAddr, emoteId, targetId);
+        } 
+        catch (Exception e) 
+        {
+            PluginLog.Error(e.ToString());
+        }
         HookEmote?.Original(unk, instigatorAddr, emoteId, targetId, unk2);
     }
 }
