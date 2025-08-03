@@ -49,7 +49,7 @@ public sealed class Plugin : IDalamudPlugin
             ]
         };
 
-        var patMeConfig = new PatMeConfig(PluginInterface);
+        var patMeConfig = new PatMeConfig(PluginInterface, PluginLog);
         Config.MaybeMigrate(patMeConfig);
 
         var setCharacterTitle = PluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");

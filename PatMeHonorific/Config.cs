@@ -109,8 +109,7 @@ public class Config : IPluginConfiguration
 
             if (Version < 3)
             {
-                var parsed = patMeConfig.Parsed;
-                if (parsed != null)
+                if(patMeConfig.TryParse(out var parsed))
                 {
                     foreach (var emoteData in parsed.EmoteData)
                     {
