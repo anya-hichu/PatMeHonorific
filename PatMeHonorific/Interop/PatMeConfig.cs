@@ -96,7 +96,6 @@ public class PatMeConfig(IDalamudPluginInterface pluginInterface, IPluginLog plu
                     var emoteId = emoteIds.ElementAt(i);
                     var key = new EmoteCounterKey() { CharacterId = characterId, EmoteId = emoteId, Direction = EmoteDirection.Receiving };
 
-
                     if (config.Counters.TryGetValue(key, out var internalCounter))
                     {
                         PluginLog.Verbose($"Added {internalCounter} to temporary total count using {key}");

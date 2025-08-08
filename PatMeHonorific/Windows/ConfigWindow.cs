@@ -1,18 +1,18 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
-using ImGuiNET;
 using Lumina.Excel;
 using PatMeHonorific.Emotes;
 using PatMeHonorific.Interop;
 using PatMeHonorific.Utils;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
 using Emote = Lumina.Excel.Sheets.Emote;
 
 namespace PatMeHonorific.Windows;
@@ -30,10 +30,10 @@ public class ConfigWindow : Window
 
     public ConfigWindow(IClientState clientState, Config config, ExcelSheet<Emote> emoteSheet, PatMeConfig patMeConfig, IPluginLog pluginLog) : base("PatMeHonorific - Config##configWindow")
     {
-        SizeConstraints = new WindowSizeConstraints
+        SizeConstraints = new()
         {
-            MinimumSize = new Vector2(550, 360),
-            MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
+            MinimumSize = new(550, 360),
+            MaximumSize = new(float.MaxValue, float.MaxValue)
         };
 
         ClientState = clientState;
@@ -104,7 +104,7 @@ public class ConfigWindow : Window
 
         ImGui.SameLine(ImGui.GetStyle().IndentSpacing * 1.5f);
 
-        using (ImRaii.TabBar("emoteConfigsTabBar", ImGuiTabBarFlags.AutoSelectNewTabs | ImGuiTabBarFlags.TabListPopupButton | ImGuiTabBarFlags.FittingPolicyScroll))
+        using (ImRaii.TabBar("emoteConfigsTabBar", ImGuiTabBarFlags.AutoSelectNewTabs | ImGuiTabBarFlags.ListPopupButton | ImGuiTabBarFlags.FittingPolicyScroll))
         {
             foreach (var emoteConfig in Config.EmoteConfigs.OrderByDescending(c => c.Priority))
             {

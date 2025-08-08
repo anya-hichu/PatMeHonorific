@@ -4,6 +4,7 @@ using System;
 
 namespace PatMeHonorific.Emotes;
 
+// Reference: https://github.com/MgAl2O4/PatMeDalamud/blob/42385a92d1a9c3f043f35128ee68dc623cfc6a20/plugin/EmoteReaderHooks.cs#L21C87-L21C130
 public class EmoteHook
 {
     private IPluginLog PluginLog { get; init; }
