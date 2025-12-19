@@ -11,24 +11,26 @@ namespace PatMeHonorific;
 
 public class Updater : IDisposable
 {
-    private IClientState ClientState { get; init; }
     private Config Config { get; init; }
     private EmoteHook EmoteHook { get; init; }
     private IFramework Framework { get; init; }
     private IObjectTable ObjectTable { get; init; }
+    private IPlayerState PlayerState { get; init; }
 
     private ICallGateSubscriber<int, string, object> SetCharacterTitle { get; init; }
     private ICallGateSubscriber<int, object> ClearCharacterTitle { get; init; }
 
     private DateTime? LastTitleUpdateAt { get; set; }
 
-    public Updater(ICallGateSubscriber<int, object> clearCharacterTitle, IClientState clientState, Config config, EmoteHook emoteHook, IFramework framework, IObjectTable objectTable, ICallGateSubscriber<int, string, object> setCharacterTitle) {
+    public Updater(ICallGateSubscriber<int, object> clearCharacterTitle, Config config, EmoteHook emoteHook, IFramework framework, IObjectTable objectTable, IPlayerState playerState, ICallGateSubscriber<int, string, object> setCharacterTitle) {
         ClearCharacterTitle = clearCharacterTitle;
-        ClientState = clientState;
+
         Config = config;
         EmoteHook = emoteHook;
         Framework = framework;
         ObjectTable = objectTable;
+        PlayerState = playerState;
+
         SetCharacterTitle = setCharacterTitle;
 
         Framework.Update += OnFrameworkUpdate;
@@ -43,7 +45,7 @@ public class Updater : IDisposable
 
     private bool TryUpdateCounter(ulong instigatorAddr, ushort emoteId, ulong targetId, out EmoteConfig? emoteConfig, out uint totalCounter)
     {
-        var localPlayer = ClientState.LocalPlayer;
+        var localPlayer = ObjectTable.LocalPlayer;
         if (localPlayer != null && ObjectTable.FirstOrDefault(x => (ulong)x.Address == instigatorAddr) is IPlayerCharacter instigator && instigator.GameObjectId != targetId)
         {
             EmoteDirection? maybeDirection = null;
@@ -59,13 +61,14 @@ public class Updater : IDisposable
             if (maybeDirection.HasValue)
             {
                 var direction = maybeDirection.Value;
-                var characterId = ClientState.LocalContentId;
+                var characterId = PlayerState.ContentId;
 
-                emoteConfig = Config.EmoteConfigs.OrderByDescending(c => c.Priority).FirstOrDefault(c => c.Enabled && c.EmoteIds.Contains(emoteId) && c.Direction == direction && (c.CharacterIds.Count == 0 || c.CharacterIds.Contains(ClientState.LocalContentId)));
+                emoteConfig = Config.EmoteConfigs.OrderByDescending(c => c.Priority).FirstOrDefault(c => c.Enabled && c.EmoteIds.Contains(emoteId) && c.Direction == direction && (c.CharacterIds.Count == 0 || c.CharacterIds.Contains(PlayerState.ContentId)));
                 if (emoteConfig != null)
                 {
                     totalCounter = 0;
-                    foreach (var configEmoteId in emoteConfig.EmoteIds) {
+                    foreach (var configEmoteId in emoteConfig.EmoteIds) 
+                    {
                         var key = new EmoteCounterKey() { CharacterId = characterId, Direction = direction, EmoteId = configEmoteId };
                         Config.Counters.TryAdd(key, 0);
                         if (configEmoteId == emoteId)

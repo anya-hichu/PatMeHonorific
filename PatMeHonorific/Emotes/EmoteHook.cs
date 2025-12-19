@@ -44,7 +44,7 @@ public class EmoteHook
         } 
         catch (Exception e) 
         {
-            PluginLog.Error(e.ToString());
+            PluginLog.Error(e.Message);
         }
         HookEmote?.Original(unk, instigatorAddr, emoteId, targetId, unk2);
     }

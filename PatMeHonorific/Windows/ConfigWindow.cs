@@ -21,14 +21,14 @@ public class ConfigWindow : Window
 {
     private static readonly string CONFIRM_DELETE_HINT = "Press CTRL while clicking to confirm";
 
-    private IClientState ClientState { get; init; }
+    private IPlayerState PlayerState { get; init; }
     private Config Config { get; init; }
     private Dictionary<ushort, HashSet<string>> CommandsByEmoteId { get; init; }
     private ImGuiHelper ImGuiHelper { get; init; } = new();
     private PatMeConfig PatMeConfig { get; init; }
     private IPluginLog PluginLog { get; init; }
 
-    public ConfigWindow(IClientState clientState, Config config, ExcelSheet<Emote> emoteSheet, PatMeConfig patMeConfig, IPluginLog pluginLog) : base("PatMeHonorific - Config##configWindow")
+    public ConfigWindow(IPlayerState playerState, Config config, ExcelSheet<Emote> emoteSheet, PatMeConfig patMeConfig, IPluginLog pluginLog) : base("PatMeHonorific - Config##configWindow")
     {
         SizeConstraints = new()
         {
@@ -36,7 +36,7 @@ public class ConfigWindow : Window
             MaximumSize = new(float.MaxValue, float.MaxValue)
         };
 
-        ClientState = clientState;
+        PlayerState = playerState;
         Config = config;
 
         CommandsByEmoteId = emoteSheet.Where(s => s.TextCommand.IsValid).ToDictionary(s => Convert.ToUInt16(s.RowId), s => {
@@ -200,12 +200,12 @@ public class ConfigWindow : Window
                             ImGui.SameLine();
                             if (ImGui.Button($"Add Current"))
                             {
-                                emoteConfig.CharacterIds.Add(ClientState.LocalContentId);
+                                emoteConfig.CharacterIds.Add(PlayerState.ContentId);
                                 Config.Save();
                             }
                             if (ImGui.IsItemHovered())
                             {
-                                ImGui.SetTooltip($"Current: {ClientState.LocalPlayer?.Name} ({ClientState.LocalContentId})");
+                                ImGui.SetTooltip($"Current: {PlayerState.CharacterName} ({PlayerState.ContentId})");
                             }
 
 
