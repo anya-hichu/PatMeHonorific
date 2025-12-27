@@ -4,11 +4,12 @@ using System.Numerics;
 
 namespace PatMeHonorific.Utils;
 
-public class ImGuiHelper
+public class CustomImGui
 {
     // Source: https://github.com/Caraxi/Honorific/blob/1.4.1.0/ConfigWindow.cs#L826
     private Vector3 editingColour = Vector3.One;
-    public bool DrawColorPicker(string label, ref Vector3? color, Vector2 checkboxSize)
+
+    public bool ColorPicker(string label, ref Vector3? color, Vector2 checkboxSize)
     {
         var modified = false;
         bool comboOpen;

@@ -1,14 +1,17 @@
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using Newtonsoft.Json;
+using PatMeHonorific.Configs;
+using PatMeHonorific.Configs.PatMe;
 using PatMeHonorific.Emotes;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 
 namespace PatMeHonorific.Interop;
 
-public class PatMeConfig(IDalamudPluginInterface pluginInterface, IPluginLog pluginLog)
+public class PatMeSynchronizer(IDalamudPluginInterface pluginInterface, IPluginLog pluginLog)
 {
     private static readonly Dictionary<string, HashSet<ushort>> EMOTE_NAME_TO_IDS = new()
     {
@@ -17,64 +20,34 @@ public class PatMeConfig(IDalamudPluginInterface pluginInterface, IPluginLog plu
         { "Hug", [112, 113] },
     };
 
-    public class JsonConfig
-    {
-        [JsonProperty(Required = Required.Always)]
-        public EmoteDataConfig[] EmoteData { get; set; } = [];
-    }
-
-    public class EmoteDataConfig
-    {
-        [JsonProperty(Required = Required.Always)]
-        public ulong CID { get; set; }
-
-        [JsonProperty(Required = Required.Always)]
-        public CounterConfig[] Counters { get; set; } = [];
-
-        public override string ToString()
-        {
-            return $"{nameof(EmoteDataConfig)} {{ {nameof(CID)} = {CID}, {nameof(Counters)} = [\n\t{string.Join(",\n\t", [..Counters])}\n] }}";
-        }
-    }
-
-    public record CounterConfig
-    {
-        [JsonProperty(Required = Required.Always)]
-        public string Name { get; set; } = string.Empty;
-
-        [JsonProperty(Required = Required.Always)]
-        public uint Value { get; set; }
-    }
-
     private IDalamudPluginInterface PluginInterface { get; init; } = pluginInterface;
     private IPluginLog PluginLog { get; init; } = pluginLog;
 
-    public bool TryParse(out JsonConfig parsed)
+    private bool TryParse([NotNullWhen(true)] out PatMeConfig? parsed)
     {
+        parsed = null;
+
         var pluginConfigsDirectory = Path.GetFullPath(Path.Combine(PluginInterface.GetPluginConfigDirectory(), ".."));
+
         // %appdata%\xivlauncher\pluginConfigs\PatMe.json
         var patMeConfigPath = Path.Combine(pluginConfigsDirectory, "PatMe.json");
+
         if (!Path.Exists(patMeConfigPath))
         {
             PluginLog.Error($"PatMe config not found at {patMeConfigPath}");
-            parsed = null!;
             return false;
         }
 
-        using StreamReader patMeConfigFile = new(patMeConfigPath);
-        var patMeConfigJson = patMeConfigFile.ReadToEnd();
-        parsed = JsonConvert.DeserializeObject<JsonConfig>(patMeConfigJson)!;
+        var pathMeConfigJson = File.ReadAllText(patMeConfigPath);
+        parsed = JsonConvert.DeserializeObject<PatMeConfig>(pathMeConfigJson);
+        if (parsed != null) return true;
 
-        if (parsed == null)
-        {
-            PluginLog.Error($"Failed to parse PatMe config at {patMeConfigPath}");
-            return false;
-        }
-
-        return true;
+        PluginLog.Error($"Failed to parse PatMe config at {patMeConfigPath}");
+        return false;
     }
 
-    public bool TrySync(Config config)
+
+    public bool TryUpdate(Config config)
     {
         if (!TryParse(out var parsed))
         {
@@ -103,21 +76,19 @@ public class PatMeConfig(IDalamudPluginInterface pluginInterface, IPluginLog plu
                     }
 
                     // Update the count of the first emote only since patme doesn't differentiate
-                    if (i == 0)
-                    {
-                        PluginLog.Verbose($"Using temporary total count {internalCounter} for {key}");
+                    if (i > 0) continue;
 
-                        var value = counter.Value - totalCounter;
-                        if (config.Counters.TryAdd(key, value))
-                        {
-                            PluginLog.Debug($"Set new {key} to value {value}");
-                        } 
-                        else
-                        {
-                            config.Counters[key] += value;
-                            PluginLog.Debug($"Added {value} to existing {key} now has value {config.Counters[key]}");
-                        }
+                    PluginLog.Verbose($"Using temporary total count {internalCounter} for {key}");
+
+                    var value = counter.Value - totalCounter;
+                    if (config.Counters.TryAdd(key, value))
+                    {
+                        PluginLog.Debug($"Set new {key} to value {value}");
+                        continue;
                     }
+
+                    config.Counters[key] += value;
+                    PluginLog.Debug($"Added {value} to existing {key} now has value {config.Counters[key]}");
                 }
             }
         }

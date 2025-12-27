@@ -4,6 +4,6 @@ using System.Collections.Generic;
 namespace PatMeHonorific.Emotes;
 
 [JsonArray]
-public class EmoteCounters : Dictionary<EmoteCounterKey, uint>
+public class EmoteCounters<T> : Dictionary<EmoteCounterKey, T>
 {
 }

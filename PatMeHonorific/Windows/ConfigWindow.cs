@@ -3,12 +3,15 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using Lumina.Excel;
+using PatMeHonorific.Configs;
 using PatMeHonorific.Emotes;
 using PatMeHonorific.Interop;
 using PatMeHonorific.Utils;
+using Scriban;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,23 +24,28 @@ public class ConfigWindow : Window
 {
     private static readonly string CONFIRM_DELETE_HINT = "Press CTRL while clicking to confirm";
 
-    private IPlayerState PlayerState { get; init; }
     private Config Config { get; init; }
-    private Dictionary<ushort, HashSet<string>> CommandsByEmoteId { get; init; }
-    private ImGuiHelper ImGuiHelper { get; init; } = new();
-    private PatMeConfig PatMeConfig { get; init; }
+    private PatMeSynchronizer PatMeSynchronizer { get; init; }
+    private IPlayerState PlayerState { get; init; }
+    private IDalamudPluginInterface PluginInterface { get; init; }
     private IPluginLog PluginLog { get; init; }
 
-    public ConfigWindow(IPlayerState playerState, Config config, ExcelSheet<Emote> emoteSheet, PatMeConfig patMeConfig, IPluginLog pluginLog) : base("PatMeHonorific - Config##configWindow")
+    private Dictionary<ushort, HashSet<string>> CommandsByEmoteId { get; init; }
+    private CustomImGui CustomImGui { get; init; } = new();
+
+    public ConfigWindow(Config config, ExcelSheet<Emote> emoteSheet, PatMeSynchronizer patMeSynchronizer, IPlayerState playerState, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog) : base("PatMeHonorific - Config##configWindow")
     {
         SizeConstraints = new()
         {
-            MinimumSize = new(550, 360),
+            MinimumSize = new(850, 435),
             MaximumSize = new(float.MaxValue, float.MaxValue)
         };
-
-        PlayerState = playerState;
+     
         Config = config;
+        PlayerState = playerState;
+        PatMeSynchronizer = patMeSynchronizer;
+        PluginInterface = pluginInterface;
+        PluginLog = pluginLog;
 
         CommandsByEmoteId = emoteSheet.Where(s => s.TextCommand.IsValid).ToDictionary(s => Convert.ToUInt16(s.RowId), s => {
             var textCommand = s.TextCommand.Value;
@@ -49,9 +57,6 @@ public class ConfigWindow : Window
             commands.Add(textCommand.Command.ToString());
             return commands;
         });
-
-        PatMeConfig = patMeConfig;
-        PluginLog = pluginLog;
     }
 
     public override void Draw()
@@ -60,15 +65,40 @@ public class ConfigWindow : Window
         if (ImGui.Checkbox("Enabled###enabled", ref enabled))
         {
             Config.Enabled = enabled;
-            Config.Save();
+            SaveConfig();
         }
 
-        ImGui.SameLine(ImGui.GetWindowWidth() - 135);
+        ImGui.SameLine(ImGui.GetWindowWidth() - 545);
+
+        var autoClearDelayMs = Config.AutoClearDelayMs;
+        ImGui.SetNextItemWidth(150);
+        if (ImGui.InputUShort("Auto-Clear (ms)###autoClearDelayMs", ref autoClearDelayMs, 50))
+        {
+            Config.AutoClearDelayMs = autoClearDelayMs;
+            SaveConfig();
+        }
+
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+
+        var isHonorificSupporter = Config.IsHonorificSupporter;
+        if (ImGui.Checkbox("Honorific Supporter##isHonorificSupporter", ref isHonorificSupporter))
+        {
+            Config.IsHonorificSupporter = isHonorificSupporter;
+            SaveConfig();
+        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Only check if supporting Honorific author via https://ko-fi.com/Caraxi, it gives access to extra features");
+
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+
         if (ImGui.Button("Sync###sync"))
         {
-            if(PatMeConfig.TrySync(Config))
+            if(PatMeSynchronizer.TryUpdate(Config))
             {
-                Config.Save();
+                SaveConfig();
                 PluginLog.Info("Successfully synced with patme");
             } 
             else
@@ -87,7 +117,7 @@ public class ConfigWindow : Window
             if (ImGui.Button("Delete All###generatorConfigsDeleteAll") && ImGui.GetIO().KeyCtrl)
             {
                 Config.EmoteConfigs.Clear();
-                Config.Save();
+                SaveConfig();
             }
             if (ImGui.IsItemHovered())
             {
@@ -99,7 +129,7 @@ public class ConfigWindow : Window
         if (ImGui.Button("+###emoteConfigsNew"))
         {
             Config.EmoteConfigs.Add(new());
-            Config.Save();
+            SaveConfig();
         }
 
         ImGui.SameLine(ImGui.GetStyle().IndentSpacing * 1.5f);
@@ -121,14 +151,14 @@ public class ConfigWindow : Window
                             if (ImGui.Checkbox($"Enabled###{baseId}Enabled", ref emoteEnabled))
                             {
                                 emoteConfig.Enabled = emoteEnabled;
-                                Config.Save();
+                                SaveConfig();
                             }
 
                             ImGui.SameLine(ImGui.GetWindowWidth() - 145);
                             if (ImGui.Button($"Duplicate###{baseId}Duplicate"))
                             {
                                 Config.EmoteConfigs.Add(emoteConfig.Clone());
-                                Config.Save();
+                                SaveConfig();
                             }
                             ImGui.SameLine();
                             using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.DalamudRed))
@@ -136,7 +166,7 @@ public class ConfigWindow : Window
                                 if (ImGui.Button($"Delete###{baseId}Delete") && ImGui.GetIO().KeyCtrl)
                                 {
                                     Config.EmoteConfigs.Remove(emoteConfig);
-                                    Config.Save();
+                                    SaveConfig();
                                 }
                                 if (ImGui.IsItemHovered())
                                 {
@@ -147,14 +177,14 @@ public class ConfigWindow : Window
                             if (ImGui.InputText($"Name###{baseId}Name", ref name, 255))
                             {
                                 emoteConfig.Name = name;
-                                Config.Save();
+                                SaveConfig();
                             }
 
                             var priority = emoteConfig.Priority;
                             if (ImGui.InputInt($"Priority###{baseId}Priority", ref priority, 1))
                             {
                                 emoteConfig.Priority = priority;
-                                Config.Save();
+                                SaveConfig();
                             }
 
                             var direction = emoteConfig.Direction;
@@ -167,7 +197,7 @@ public class ConfigWindow : Window
                             {
                                 var newDirectionName = directionNames.ElementAt(directionNameIndex);
                                 emoteConfig.Direction = Enum.Parse<EmoteDirection>(newDirectionName);
-                                Config.Save();
+                                SaveConfig();
                             }
 
                             var emoteIds = emoteConfig.EmoteIds;
@@ -177,7 +207,7 @@ public class ConfigWindow : Window
                             {
                                 var commands = joinedCommands.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
                                 emoteConfig.EmoteIds = [.. CommandsByEmoteId.Where(c => c.Value.Intersect(commands).Any()).Select(c => c.Key)];
-                                Config.Save();
+                                SaveConfig();
                             }
                             if(ImGui.IsItemHovered())
                             {
@@ -191,7 +221,7 @@ public class ConfigWindow : Window
                             {
                                 var rawCharacterIds = joinedCharacterIds.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
                                 emoteConfig.CharacterIds = [.. rawCharacterIds.Where(s => ulong.TryParse(s, out var _)).Select(s => ulong.Parse(s))];
-                                Config.Save();
+                                SaveConfig();
                             }
                             if (ImGui.IsItemHovered())
                             {
@@ -201,59 +231,123 @@ public class ConfigWindow : Window
                             if (ImGui.Button($"Add Current"))
                             {
                                 emoteConfig.CharacterIds.Add(PlayerState.ContentId);
-                                Config.Save();
+                                SaveConfig();
                             }
                             if (ImGui.IsItemHovered())
                             {
                                 ImGui.SetTooltip($"Current: {PlayerState.CharacterName} ({PlayerState.ContentId})");
                             }
 
-
                             var titleTemplate = emoteConfig.TitleTemplate;
-                            if (ImGui.InputText($"Title template###{baseId}TitleTemplate", ref titleTemplate, 255))
+                            if (ImGui.InputTextMultiline($"Title Template (scriban)###{baseId}TitleTemplate", ref titleTemplate, ushort.MaxValue))
                             {
                                 emoteConfig.TitleTemplate = titleTemplate;
-                                Config.Save();
+                                SaveConfig();
                             }
-                            ImGuiComponents.HelpMarker("Use {0} as placeholder for count");
-
-                            var checkboxSize = new Vector2(ImGui.GetTextLineHeightWithSpacing(), ImGui.GetTextLineHeightWithSpacing());
-                            var color = emoteConfig.Color;
-                            if (ImGuiHelper.DrawColorPicker($"Color###{baseId}Color", ref color, checkboxSize))
+                            if (ImGui.IsItemHovered() && !TryParseTemplate(titleTemplate, out var logMessageBag))
                             {
-                                emoteConfig.Color = color;
-                                Config.Save();
+                                using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
+                                ImGui.SetTooltip(string.Join("\n", logMessageBag));
                             }
+                            ImGuiComponents.HelpMarker($"Available variables: total_count, session_count and combo_count\nSyntax reference available on https://github.com/scriban/scriban\n\nRendered title above the maximum supported length will be ignored ({Constraint.MaxTitleLength} characters)");
 
-                            ImGui.SameLine();
-                            ImGui.Spacing();
-                            ImGui.SameLine();
-                            var glow = emoteConfig.Glow;
-                            if (ImGuiHelper.DrawColorPicker($"Glow###{baseId}Glow", ref glow, checkboxSize))
-                            {
-                                emoteConfig.Glow = glow;
-                                Config.Save();
-                            }
-
-                            ImGui.SameLine();
-                            var isPrefix = emoteConfig.IsPrefix;
-                            if (ImGui.Checkbox($"Prefix###{baseId}Prefix", ref isPrefix))
-                            {
-                                emoteConfig.IsPrefix = isPrefix;
-                                Config.Save();
-                            }
+                            emoteConfig.TitleDataConfig ??= new();
+                            DrawSettings(baseId, emoteConfig.TitleDataConfig);
                         }
                     }
                 }
             }
         }
+    }
 
-        ImGui.NewLine();
-        var autoClearTitleInterval = Config.AutoClearTitleInterval;
-        if (ImGui.InputInt("Auto clear (secs)###autoClearTitleInterval", ref autoClearTitleInterval))
+
+    private void DrawSettings(string baseId, TitleDataConfig titleDataConfig)
+    {
+        var nestedId = $"{baseId}TitleDataConfig";
+
+        var isPrefix = titleDataConfig.IsPrefix;
+        if (ImGui.Checkbox($"Prefix###{nestedId}Prefix", ref isPrefix))
         {
-            Config.AutoClearTitleInterval = autoClearTitleInterval;
-            Config.Save();
+            titleDataConfig.IsPrefix = isPrefix;
+            SaveConfig();
+        }
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+
+        var checkboxSize = new Vector2(ImGui.GetTextLineHeightWithSpacing(), ImGui.GetTextLineHeightWithSpacing());
+
+        var color = titleDataConfig.Color;
+        if (CustomImGui.ColorPicker($"Color###{nestedId}Color", ref color, checkboxSize))
+        {
+            titleDataConfig.Color = color;
+            SaveConfig();
+        }
+
+        var maybeGradientColourSet = titleDataConfig.GradientColourSet;
+        if (!Config.IsHonorificSupporter || !maybeGradientColourSet.HasValue)
+        {
+            ImGui.SameLine();
+            ImGui.Spacing();
+            ImGui.SameLine();
+            var glow = titleDataConfig.Glow;
+            if (CustomImGui.ColorPicker($"Glow###{nestedId}Glow", ref glow, checkboxSize))
+            {
+                titleDataConfig.Glow = glow;
+                SaveConfig();
+            }
+        }
+
+        if (!Config.IsHonorificSupporter) return;
+
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+
+        var gradientColourSets = Enum.GetValues<GradientColourSet>();
+        var selectedGradientColourSetIndex = maybeGradientColourSet.HasValue ? gradientColourSets.IndexOf(maybeGradientColourSet.Value) + 1 : 0;
+
+        var comboWidth = 140;
+        ImGui.SetNextItemWidth(comboWidth);
+        if (ImGui.Combo($"Gradient Color Set###{nestedId}GradientColorSet", ref selectedGradientColourSetIndex, gradientColourSets.Select(s => s.GetFancyName()).Prepend("None").ToArray()))
+        {
+            if (selectedGradientColourSetIndex == 0)
+            {
+                titleDataConfig.GradientColourSet = null;
+                titleDataConfig.GradientAnimationStyle = null;
+            }
+            else
+            {
+                titleDataConfig.GradientColourSet = gradientColourSets.ElementAt(selectedGradientColourSetIndex - 1);
+            }
+            SaveConfig();
+        }
+
+        if (!titleDataConfig.GradientColourSet.HasValue) return;
+
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+
+        var maybeGradientAnimationStyle = titleDataConfig.GradientAnimationStyle;
+
+        var gradientAnimationStyles = Enum.GetValues<GradientAnimationStyle>();
+        var selectedGradientAnimationStyleIndex = maybeGradientAnimationStyle.HasValue ? gradientAnimationStyles.IndexOf(maybeGradientAnimationStyle.Value) + 1 : 0;
+
+        ImGui.SetNextItemWidth(comboWidth);
+        if (ImGui.Combo($"Gradient Animation Style###{nestedId}GradientAnimationStyle", ref selectedGradientAnimationStyleIndex, gradientAnimationStyles.Select(s => s.ToString()).Prepend("None").ToArray()))
+        {
+            titleDataConfig.GradientAnimationStyle = selectedGradientAnimationStyleIndex == 0 ? null : gradientAnimationStyles.ElementAt(selectedGradientAnimationStyleIndex - 1);
+            SaveConfig();
         }
     }
+
+    private static bool TryParseTemplate(string template, out LogMessageBag logMessageBag)
+    {
+        var parsed = Template.Parse(template);
+        logMessageBag = parsed.Messages;
+        return !parsed.HasErrors;
+    }
+
+    private void SaveConfig() => PluginInterface.SavePluginConfig(Config);
 }

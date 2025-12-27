@@ -7,24 +7,25 @@ using PatMeHonorific.Interop;
 using PatMeHonorific.Emotes;
 using Dalamud.Game.Command;
 using Emote = Lumina.Excel.Sheets.Emote;
-using Dalamud.Utility;
 using System.Linq;
 using Lumina.Excel;
+using PatMeHonorific.Configs;
+using PatMeHonorific.Updaters;
 
 namespace PatMeHonorific;
 
 public sealed class Plugin : IDalamudPlugin
 {
-    [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
-    [PluginService] internal static IPlayerState PlayerState { get; private set; } = null!;
-    [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
-    [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
-    [PluginService] internal static IFramework Framework { get; private set; } = null!;
-    [PluginService] internal static IGameInteropProvider GameInteropProvider { get; private set; } = null!;
+    [PluginService] private static IChatGui ChatGui { get; set; } = null!;
+    [PluginService] private static IPlayerState PlayerState { get; set; } = null!;
+    [PluginService] private static ICommandManager CommandManager { get; set; } = null!;
+    [PluginService] private static IDataManager DataManager { get; set; } = null!;
+    [PluginService] private static IFramework Framework { get; set; } = null!;
+    [PluginService] private static IGameInteropProvider GameInteropProvider { get; set; } = null!;
 
-    [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
-    [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
-    [PluginService] internal static IPluginLog PluginLog { get; private set; } = null!;
+    [PluginService] private static IObjectTable ObjectTable { get; set; } = null!;
+    [PluginService] private static IDalamudPluginInterface PluginInterface { get; set; } = null!;
+    [PluginService] private static IPluginLog PluginLog { get; set; } = null!;
 
     private const string CommandName = "/patmehonorific";
     private const string CommandHelpMessage = $"Available subcommands for {CommandName} are info, config, enable and disable";
@@ -43,22 +44,26 @@ public sealed class Plugin : IDalamudPlugin
         Config = PluginInterface.GetPluginConfig() as Config ?? new Config()
         {
             EmoteConfigs = [
-                new() { Name = "Receiving Pet", EmoteIds = [105], TitleTemplate = "Pet Counter {0}" },
-                new() { Name = "Receiving Dote", EmoteIds = [146], TitleTemplate = "Dote Counter {0}" },
-                new() { Name = "Receiving Hug",  EmoteIds = [112, 113], TitleTemplate = "Hug Counter {0}" }
+                new() { Name = "Receiving Pet", EmoteIds = [105], TitleTemplate = "Pet Counter {{ total_count }}" },
+                new() { Name = "Receiving Dote", EmoteIds = [146], TitleTemplate = "Dote Counter {{ total_count }}" },
+                new() { Name = "Receiving Hug",  EmoteIds = [112, 113], TitleTemplate = "Hug Counter {{ total_count }}" }
             ]
         };
 
-        var patMeConfig = new PatMeConfig(PluginInterface, PluginLog);
+        #region Deprecated
+        new ConfigMigrator(PluginInterface).MaybeMigrate(Config);
+        #endregion
+
+        var patMeSynchronizer = new PatMeSynchronizer(PluginInterface, PluginLog);
 
         var setCharacterTitle = PluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
         var clearCharacterTitle = PluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
 
         EmoteSheet = DataManager.GetExcelSheet<Emote>()!;
-        ConfigWindow = new(PlayerState, Config, EmoteSheet, patMeConfig, PluginLog);
+        ConfigWindow = new(Config, EmoteSheet, patMeSynchronizer, PlayerState, PluginInterface, PluginLog);
         EmoteHook = new(PluginLog, GameInteropProvider);
 
-        Updater = new(clearCharacterTitle, Config, EmoteHook, Framework, ObjectTable, PlayerState, setCharacterTitle);
+        Updater = new(clearCharacterTitle, Config, EmoteHook, Framework, ObjectTable, PlayerState, PluginLog, PluginInterface, setCharacterTitle);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -83,12 +88,12 @@ public sealed class Plugin : IDalamudPlugin
         else if (subcommand == "enable")
         {
             Config.Enabled = true;
-            Config.Save();
+            SaveConfig();
         }
         else if (subcommand == "disable")
         {
             Config.Enabled = false;
-            Config.Save();
+            SaveConfig();
         }
         else if (subcommand == "info")
         {
@@ -120,4 +125,6 @@ public sealed class Plugin : IDalamudPlugin
     private void DrawUI() => WindowSystem.Draw();
 
     public void ToggleConfigUI() => ConfigWindow.Toggle();
+
+    private void SaveConfig() => PluginInterface.SavePluginConfig(Config);
 }
