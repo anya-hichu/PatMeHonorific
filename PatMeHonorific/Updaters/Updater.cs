@@ -61,7 +61,7 @@ public class Updater : IDisposable
         comboCounter = null;
 
         var localPlayer = ObjectTable.LocalPlayer;
-        if (localPlayer != null && ObjectTable.FirstOrDefault(x => (ulong)x.Address == instigatorAddr) is IPlayerCharacter instigator)// && instigator.GameObjectId != targetId)
+        if (localPlayer != null && ObjectTable.FirstOrDefault(x => (ulong)x.Address == instigatorAddr) is IPlayerCharacter instigator && instigator.GameObjectId != targetId)
         {
             EmoteDirection? maybeDirection = null;
             if (targetId == localPlayer.GameObjectId)
@@ -144,7 +144,7 @@ public class Updater : IDisposable
                 var serializedData = JsonConvert.SerializeObject(titleData, Formatting.Indented);
                 if (serializedData == null) return;
 
-                PluginLog.Verbose($"Call Honorific SetCharacterTitle IPC with:\n{serializedData}");
+                PluginLog.Debug($"Call Honorific SetCharacterTitle IPC with:\n{serializedData}");
 
                 SetCharacterTitle.InvokeAction(0, serializedData);
                 LastUpdateAt = DateTime.Now;
@@ -160,7 +160,7 @@ public class Updater : IDisposable
     {
         if (LastUpdateAt.HasValue && DateTimeOffset.UtcNow.Subtract(LastUpdateAt.Value) > TimeSpan.FromMilliseconds(Config.AutoClearDelayMs))
         {
-            PluginLog.Verbose($"Call Honorific ClearCharacterTitle IPC after delay");
+            PluginLog.Debug($"Call Honorific ClearCharacterTitle IPC after delay");
             ClearCharacterTitle.InvokeAction(0);
             LastUpdateAt = null;
         }
