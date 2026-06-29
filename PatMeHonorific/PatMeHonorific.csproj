@@ -7,6 +7,6 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Scriban" Version="7.2.4" />
+    <PackageReference Include="Scriban" Version="7.2.5" />
   </ItemGroup>
 </Project>
